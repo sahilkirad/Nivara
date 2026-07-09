@@ -7,7 +7,11 @@ class Settings(BaseSettings):
     environment: str = Field(default="local", alias="ENVIRONMENT")
 
     database_url: str = Field(alias="DATABASE_URL")
+
     kafka_bootstrap_servers: str = Field(alias="KAFKA_BOOTSTRAP_SERVERS")
+    context_events_topic: str = Field(alias="CONTEXT_EVENTS_TOPIC")
+    outbox_publish_interval_seconds: int = Field(default=5, alias="OUTBOX_PUBLISH_INTERVAL_SECONDS")
+
     encryption_key: str = Field(alias="ENCRYPTION_KEY")
 
     model_config = SettingsConfigDict(
