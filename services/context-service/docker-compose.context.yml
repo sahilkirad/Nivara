@@ -1,0 +1,41 @@
+services:
+  context-db:
+    image: postgres:16-alpine
+    container_name: nivara-context-db
+    environment:
+      POSTGRES_DB: context_db
+      POSTGRES_USER: context_user
+      POSTGRES_PASSWORD: context_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - context_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U context_user -d context_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - nivara-network
+
+  context-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nivara-context-service
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    depends_on:
+      context-db:
+        condition: service_healthy
+    networks:
+      - nivara-network
+
+volumes:
+  context_db_data:
+
+networks:
+  nivara-network:
+    external: true
