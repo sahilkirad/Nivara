@@ -12,7 +12,9 @@ class Settings(BaseSettings):
     context_events_topic: str = Field(alias="CONTEXT_EVENTS_TOPIC")
     agent_events_topic: str = Field(alias="AGENT_EVENTS_TOPIC")
     outbox_publish_interval_seconds: int = Field(default=5, alias="OUTBOX_PUBLISH_INTERVAL_SECONDS")
-
+    gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
+    gemini_model: str = Field(default="gemini-3.1-flash", alias="GEMINI_MODEL")
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
