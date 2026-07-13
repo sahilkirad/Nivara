@@ -111,7 +111,7 @@ class AgentWorkflow:
         self.db.add(agent_run)
         self.db.add(episode)
         self.db.add(outbox_event)
-        self.db.commit()
+        self.db.flush()
 
     def _to_uuid(self, value: str) -> UUID:
         return UUID(str(value))
