@@ -1,15 +1,30 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from app.core.config import settings
 from app.db.init_db import init_db
+from app.events.kafka_consumer import AgentContextEventConsumer
 
 
-app = FastAPI(title="Nivara Agent Service")
+context_event_consumer = AgentContextEventConsumer()
 
 
-@app.on_event("startup")
-def on_startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
+    await context_event_consumer.start()
+
+    try:
+        yield
+    finally:
+        await context_event_consumer.stop()
+
+
+app = FastAPI(
+    title="Nivara Agent Service",
+    lifespan=lifespan,
+)
 
 
 @app.get("/health")
