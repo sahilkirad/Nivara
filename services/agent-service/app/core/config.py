@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     outbox_publish_interval_seconds: int = Field(default=5, alias="OUTBOX_PUBLISH_INTERVAL_SECONDS")
     agent_consumer_group: str = Field(default="agent-service-group", alias="AGENT_CONSUMER_GROUP")
     consumer_retry_backoff_seconds: int = Field(default=5, alias="CONSUMER_RETRY_BACKOFF_SECONDS")
+    outbox_batch_size: int = Field(default=20, alias="OUTBOX_BATCH_SIZE")
     gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
     gemini_model: str = Field(default="gemini-3.1-flash", alias="GEMINI_MODEL")
     
