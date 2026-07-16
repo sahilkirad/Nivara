@@ -70,7 +70,25 @@ class OutboxEvent(Base):
     correlation_id: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     published: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(40), default="pending")
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+class DeadLetterEvent(Base):
+    __tablename__ = "dead_letter_events"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    source_event_id: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    aggregate_id: Mapped[str | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    correlation_id: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False)
+    source_service: Mapped[str] = mapped_column(String(120), nullable=False)
+    target_topic: Mapped[str] = mapped_column(String(200), nullable=False)
+    failure_stage: Mapped[str] = mapped_column(String(120), nullable=False)
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    last_error: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), default="dead_lettered")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

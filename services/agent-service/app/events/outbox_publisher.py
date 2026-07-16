@@ -1,20 +1,19 @@
-# This file does that. It only marks the event as 
-# published after Kafka accepts it. 
-# If Kafka is down, the event remains unpublished and 
-# gets retried in the next loop.
 import asyncio
 import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
 from app.core.config import settings
-from app.db.models import OutboxEvent
+from app.db.models import DeadLetterEvent, OutboxEvent
 from app.db.session import SessionLocal
 from app.events.contracts import EventEnvelope
 from app.events.kafka_producer import KafkaEventProducer
 
 
 logger = logging.getLogger(__name__)
+
+
+RETRYABLE_OUTBOX_STATUSES = ("pending", "failed")
 
 
 class OutboxPublisher:
@@ -54,10 +53,9 @@ class OutboxPublisher:
             events = (
                 db.query(OutboxEvent)
                 .filter(OutboxEvent.published.is_(False))
+                .filter(OutboxEvent.status.in_(RETRYABLE_OUTBOX_STATUSES))
+                .filter(OutboxEvent.retry_count < settings.max_outbox_retry_count)
                 .order_by(OutboxEvent.created_at.asc())
-                #This matters when we later run multiple agent-service containers
-                #skip_locked=True helps avoid both instances trying to publish the same row at the same time.
-                #this is production friendly for horizontal scaling
                 .with_for_update(skip_locked=True)
                 .limit(settings.outbox_batch_size)
                 .all()
@@ -80,27 +78,67 @@ class OutboxPublisher:
             )
 
             event.published = True
+            event.status = "published"
             event.published_at = datetime.now(timezone.utc)
             event.last_error = None
             db.commit()
 
         except Exception as exc:
             db.rollback()
+            await self._handle_publish_failure(db, event.id, str(exc))
 
-            event.retry_count = (event.retry_count or 0) + 1
-            event.last_error = str(exc)
-            db.add(event)
-            db.commit()
+    async def _handle_publish_failure(self, db, event_id, error_message: str) -> None:
+        event = db.get(OutboxEvent, event_id)
+
+        if not event:
+            logger.error("Outbox event %s was not found after publish failure.", event_id)
+            return
+
+        next_retry_count = (event.retry_count or 0) + 1
+
+        event.retry_count = next_retry_count
+        event.last_error = error_message
+        event.published = False
+
+        if next_retry_count >= settings.max_outbox_retry_count:
+            event.status = "dead_lettered"
+
+            dead_letter_event = DeadLetterEvent(
+                source_event_id=event.id,
+                event_type=event.event_type,
+                aggregate_id=event.aggregate_id,
+                correlation_id=event.correlation_id,
+                source_service=settings.service_name,
+                target_topic=settings.agent_events_topic,
+                failure_stage="kafka_publish",
+                retry_count=next_retry_count,
+                last_error=error_message,
+                payload=event.payload,
+                status="dead_lettered",
+            )
+
+            db.add(dead_letter_event)
+
+            logger.error(
+                "Outbox event %s moved to dead letter after %s retries.",
+                event.id,
+                next_retry_count,
+            )
+
+        else:
+            event.status = "failed"
 
             logger.exception(
                 "Failed to publish outbox event %s. Retry count: %s",
                 event.id,
-                event.retry_count,
+                next_retry_count,
             )
+
+        db.add(event)
+        db.commit()
 
     def _build_event_envelope(self, event: OutboxEvent) -> EventEnvelope:
         payload = event.payload or {}
-
         customer_id = payload.get("customer_id")
 
         return EventEnvelope(
