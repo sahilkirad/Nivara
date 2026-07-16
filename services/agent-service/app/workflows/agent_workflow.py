@@ -95,6 +95,7 @@ class AgentWorkflow:
             event_type="agent.analysis.completed",
             aggregate_id=customer_id,
             correlation_id=correlation_id,
+            status="pending",
             payload={
                 "workflow_id": workflow_state["workflow_id"],
                 "customer_id": str(customer_id),
