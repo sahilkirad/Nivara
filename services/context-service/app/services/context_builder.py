@@ -1,4 +1,4 @@
-#this builder creates the payload for CustomerContextCreated
+# This builder creates the payload for customer.context.created events.
 from app.schemas import OnboardingRequest
 
 
