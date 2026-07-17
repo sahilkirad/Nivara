@@ -1,0 +1,41 @@
+services:
+  agent-db:
+    image: postgres:16-alpine
+    container_name: nivara-agent-db
+    environment:
+      POSTGRES_DB: agent_db
+      POSTGRES_USER: agent_user
+      POSTGRES_PASSWORD: agent_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - agent_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_user -d agent_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - nivara-network
+
+  agent-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nivara-agent-service
+    env_file:
+      - .env
+    ports:
+      - "8002:8002"
+    depends_on:
+      agent-db:
+        condition: service_healthy
+    networks:
+      - nivara-network
+
+volumes:
+  agent_db_data:
+
+networks:
+  nivara-network:
+    external: true

@@ -67,7 +67,7 @@ class OnboardingService:
         event = EventEnvelope(
             correlation_id=correlation_id,
             customer_id=user.id,
-            event_type="CustomerContextCreated",
+            event_type="customer.context.created",
             payload=safe_payload,
         )
 
