@@ -117,10 +117,18 @@ class AgentWorkflow:
         return sanitized_state
 
     def _build_safe_financial_metrics(self, financial_metrics: dict) -> dict:
-        return {
+                return {
             "expense_cover_months": financial_metrics.get("expense_cover_months", 0),
             "expense_ratio": financial_metrics.get("expense_ratio", 0),
+            "savings_rate": financial_metrics.get("savings_rate", 0),
+            "surplus_ratio": financial_metrics.get("surplus_ratio", 0),
+            "emergency_fund_gap": financial_metrics.get("emergency_fund_gap", 0),
+            "investment_readiness": financial_metrics.get("investment_readiness", False),
+            "insurance_gap": financial_metrics.get("insurance_gap", True),
             "monthly_surplus_band": self._amount_band(financial_metrics.get("monthly_surplus", 0)),
+            "emergency_fund_target_band": self._amount_band(
+                financial_metrics.get("emergency_fund_target_3_months", 0)
+            ),
             "income_available": financial_metrics.get("monthly_income", 0) > 0,
             "expenses_available": financial_metrics.get("monthly_expenses", 0) > 0,
             "savings_available": financial_metrics.get("savings", 0) > 0,

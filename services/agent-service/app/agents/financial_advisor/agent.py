@@ -16,7 +16,10 @@ class FinancialAdvisorAgent:
         workflow_state["explainability"]["agent_trace"].append({
             "agent": self.name,
             "status": "completed",
-            "summary": f"Discovered {len(needs)} financial needs using context and episodic memory.",
+            "summary": (
+                f"Discovered {len(needs)} financial needs using income, expense, savings, "
+                "insurance, goals, risk preference, and episodic memory signals."
+            ),
         })
 
         return workflow_state
