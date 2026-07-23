@@ -80,11 +80,22 @@ class AgentWorkflow:
             or event_payload.get("customer_id")
         )
 
+        context["personal"] = context.get("personal") or {
+            "age": payload.get("age"),
+            "occupation": payload.get("occupation"),
+            "marital_status": payload.get("marital_status"),
+        }
+
+        context["consent"] = context.get("consent") or {
+            "optional_sbi_signals_allowed": payload.get("optional_sbi_signals_allowed", False)
+        }
+
         encrypted_financial_context = payload.get("encrypted_financial_context", {})
         if encrypted_financial_context:
             context["financial"] = self._decrypt_financial_context(encrypted_financial_context)
 
         context.pop("encrypted_financial_context", None)
+        context.pop("optional_sbi_signals_allowed", None)
         return context
 
     def _decrypt_financial_context(self, encrypted_financial_context: dict) -> dict:
@@ -117,7 +128,7 @@ class AgentWorkflow:
         return sanitized_state
 
     def _build_safe_financial_metrics(self, financial_metrics: dict) -> dict:
-                return {
+            return {
             "expense_cover_months": financial_metrics.get("expense_cover_months", 0),
             "expense_ratio": financial_metrics.get("expense_ratio", 0),
             "savings_rate": financial_metrics.get("savings_rate", 0),

@@ -69,13 +69,19 @@ def apply_life_event_rules(context: dict) -> list[dict]:
     personal = context.get("personal", {})
     goals = {normalize_goal(goal) for goal in context.get("goals", [])}
 
-    age = int(to_float(personal.get("age")))
-    occupation = str(personal.get("occupation", "")).lower()
-    marital_status = str(personal.get("marital_status", "")).lower()
+    raw_age = personal.get("age")
+    age = int(to_float(raw_age)) if raw_age is not None else None
+    occupation = str(personal.get("occupation") or "").lower()
+    marital_status = str(personal.get("marital_status") or "").lower()
 
     events: list[dict] = []
 
-    if age <= 25 or "student" in occupation or "first" in occupation or "intern" in occupation:
+    if (
+        (age is not None and 18 <= age <= 25)
+        or "student" in occupation
+        or "first" in occupation
+        or "intern" in occupation
+    ):
         events.append({
             "rule_id": "LIFE_EARLY_CAREER",
             "life_event": "Early Career",
@@ -84,7 +90,7 @@ def apply_life_event_rules(context: dict) -> list[dict]:
             "source_basis": SOURCE_BASIS["NIVARA"],
         })
 
-    if 26 <= age <= 40:
+    if age is not None and 26 <= age <= 40:
         events.append({
             "rule_id": "LIFE_GROWTH_STAGE",
             "life_event": "Income Growth Stage",
@@ -120,7 +126,7 @@ def apply_life_event_rules(context: dict) -> list[dict]:
             "source_basis": SOURCE_BASIS["NIVARA"],
         })
 
-    if "retirement" in goals or age >= 45:
+    if "retirement" in goals or (age is not None and age >= 45):
         events.append({
             "rule_id": "LIFE_RETIREMENT_PLANNING",
             "life_event": "Retirement Planning",
@@ -432,9 +438,12 @@ def build_why_now(need: dict) -> str:
         return "No insurance coverage is recorded, so protection should be reviewed before long-term wealth planning."
 
     if need_name in {"Investment Readiness", "Wealth Creation"}:
+        if evidence.get("investment_readiness") is True:
+            return "Investment readiness is complete because emergency fund, surplus, and protection checks are in place."
+
         return (
-            f"Investment readiness is {evidence.get('investment_readiness', False)} based on emergency fund, "
-            "surplus, and protection checks."
+            "Investment readiness is not complete yet because emergency fund, surplus, "
+            "or protection checks still need attention."
         )
 
     return need.get("reason", "This recommendation is relevant based on the customer's current context and goals.")

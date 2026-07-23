@@ -16,9 +16,16 @@ class CustomerContextBuilder:
             "customer_id": customer_id,
             "financial_profile_id": financial_profile_id,
             "consent_snapshot_id": consent_snapshot_id,
+            "personal": {
+                "age": request.personal.age,
+                "occupation": request.personal.occupation,
+                "marital_status": request.personal.marital_status,
+            },
             "goals": request.goals,
             "risk_preference": request.risk_preference,
-            "optional_sbi_signals_allowed": request.consent.optional_sbi_signals_allowed,
+            "consent": {
+                "optional_sbi_signals_allowed": request.consent.optional_sbi_signals_allowed,
+            },
             "encrypted_financial_context": {
                 "monthly_income": field_encryptor.encrypt(self._stringify_number(request.financial.monthly_income)),
                 "monthly_expenses": field_encryptor.encrypt(self._stringify_number(request.financial.monthly_expenses)),
