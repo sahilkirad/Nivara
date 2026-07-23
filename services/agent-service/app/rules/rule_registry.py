@@ -30,9 +30,22 @@ def get_financial_metrics(context: dict) -> dict:
     investments = to_float(financial.get("investments"))
     insurance_coverage = to_float(financial.get("insurance_coverage"))
 
+    monthly_surplus = round(income - expenses, 2)
     expense_cover_months = round(savings / expenses, 2) if expenses > 0 else 0
     expense_ratio = round(expenses / income, 2) if income > 0 else 0
-    monthly_surplus = round(income - expenses, 2)
+    savings_rate = round(monthly_surplus / income, 2) if income > 0 else 0
+    surplus_ratio = savings_rate
+
+    emergency_fund_target_3_months = round(expenses * 3, 2)
+    emergency_fund_gap = max(round(emergency_fund_target_3_months - savings, 2), 0)
+
+    investment_readiness = (
+        income > 0
+        and monthly_surplus > 0
+        and expense_cover_months >= 3
+        and insurance_coverage > 0
+    )
+    insurance_gap = insurance_coverage <= 0
 
     return {
         "monthly_income": income,
@@ -40,9 +53,15 @@ def get_financial_metrics(context: dict) -> dict:
         "savings": savings,
         "investments": investments,
         "insurance_coverage": insurance_coverage,
+        "monthly_surplus": monthly_surplus,
         "expense_cover_months": expense_cover_months,
         "expense_ratio": expense_ratio,
-        "monthly_surplus": monthly_surplus,
+        "savings_rate": savings_rate,
+        "surplus_ratio": surplus_ratio,
+        "emergency_fund_target_3_months": emergency_fund_target_3_months,
+        "emergency_fund_gap": emergency_fund_gap,
+        "investment_readiness": investment_readiness,
+        "insurance_gap": insurance_gap,
     }
 
 
@@ -50,13 +69,19 @@ def apply_life_event_rules(context: dict) -> list[dict]:
     personal = context.get("personal", {})
     goals = {normalize_goal(goal) for goal in context.get("goals", [])}
 
-    age = int(to_float(personal.get("age")))
-    occupation = str(personal.get("occupation", "")).lower()
-    marital_status = str(personal.get("marital_status", "")).lower()
+    raw_age = personal.get("age")
+    age = int(to_float(raw_age)) if raw_age is not None else None
+    occupation = str(personal.get("occupation") or "").lower()
+    marital_status = str(personal.get("marital_status") or "").lower()
 
     events: list[dict] = []
 
-    if age <= 25 or "student" in occupation or "first" in occupation or "intern" in occupation:
+    if (
+        (age is not None and 18 <= age <= 25)
+        or "student" in occupation
+        or "first" in occupation
+        or "intern" in occupation
+    ):
         events.append({
             "rule_id": "LIFE_EARLY_CAREER",
             "life_event": "Early Career",
@@ -65,7 +90,7 @@ def apply_life_event_rules(context: dict) -> list[dict]:
             "source_basis": SOURCE_BASIS["NIVARA"],
         })
 
-    if 26 <= age <= 40:
+    if age is not None and 26 <= age <= 40:
         events.append({
             "rule_id": "LIFE_GROWTH_STAGE",
             "life_event": "Income Growth Stage",
@@ -101,7 +126,7 @@ def apply_life_event_rules(context: dict) -> list[dict]:
             "source_basis": SOURCE_BASIS["NIVARA"],
         })
 
-    if "retirement" in goals or age >= 45:
+    if "retirement" in goals or (age is not None and age >= 45):
         events.append({
             "rule_id": "LIFE_RETIREMENT_PLANNING",
             "life_event": "Retirement Planning",
@@ -375,11 +400,14 @@ def apply_sbi_mapping_rules(needs: list[dict]) -> list[dict]:
             "rule_id": f"MAP_{need['rule_id']}",
             "need": need["need"],
             "priority": need["priority"],
-            "recommended_services": services,
-            "reason": need["reason"],
-            "benefit": build_service_benefit(need["need"], services),
-            "source_basis": SOURCE_BASIS["SBI"],
+            "why_now": build_why_now(need),
             "evidence": need.get("evidence", {}),
+            "recommended_services": services,
+            "benefit": build_service_benefit(need["need"], services),
+            "next_best_action": build_next_action({"need": need["need"]}),
+            "caution": build_recommendation_caution(need["need"]),
+            "source_basis": SOURCE_BASIS["SBI"],
+            "reason": need["reason"],
         })
 
     return recommendations
@@ -389,8 +417,55 @@ def build_service_benefit(need: str, services: list[str]) -> str:
     if not services:
         return "No direct SBI service mapping is available for this need yet."
 
-    return f"{', '.join(services)} can help the customer take the next digital adoption step for {need}."
+    return f"{', '.join(services)} supports this need by giving the customer a practical SBI digital adoption path."
+def build_why_now(need: dict) -> str:
+    evidence = need.get("evidence", {})
+    need_name = need.get("need")
 
+    if need_name in {"Emergency Fund", "Emergency Fund Strengthening"}:
+        return (
+            f"Savings currently cover {evidence.get('expense_cover_months', 0)} months of expenses, "
+            f"with a 3-month emergency fund gap of {evidence.get('emergency_fund_gap', 0)}."
+        )
+
+    if need_name in {"Budget Stabilization", "Cash Flow Discipline", "Expense Discipline"}:
+        return (
+            f"Expense ratio is {round(evidence.get('expense_ratio', 0) * 100, 1)}%, "
+            f"and monthly surplus is currently {evidence.get('monthly_surplus', 0)}."
+        )
+
+    if need_name == "Protection Planning":
+        return "No insurance coverage is recorded, so protection should be reviewed before long-term wealth planning."
+
+    if need_name in {"Investment Readiness", "Wealth Creation"}:
+        if evidence.get("investment_readiness") is True:
+            return "Investment readiness is complete because emergency fund, surplus, and protection checks are in place."
+
+        return (
+            "Investment readiness is not complete yet because emergency fund, surplus, "
+            "or protection checks still need attention."
+        )
+
+    return need.get("reason", "This recommendation is relevant based on the customer's current context and goals.")
+
+
+def build_recommendation_caution(need: str) -> str:
+    caution_map = {
+        "Emergency Fund": "Keep emergency money liquid and verify deposit terms before locking funds.",
+        "Emergency Fund Strengthening": "Avoid putting all emergency money into products with withdrawal restrictions.",
+        "Protection Planning": "Review coverage, exclusions, premium affordability, and policy terms before buying insurance.",
+        "Investment Readiness": "Avoid market-linked products until basic emergency and protection needs are handled.",
+        "Wealth Creation": "Market-linked investments carry risk; invest only after understanding risk-return suitability.",
+        "Balanced Growth Planning": "Balance safety and growth; do not choose products only because returns look attractive.",
+        "Risk-Aware Growth Planning": "Aggressive products can fluctuate; verify suitability and risk appetite carefully.",
+        "Home Down Payment Planning": "Check EMI affordability, tenure, interest type, and total repayment responsibility.",
+        "Fraud Awareness": "Use only official SBI channels and never share OTP, PIN, password, or credentials.",
+    }
+
+    return caution_map.get(
+        need,
+        "Verify product details through official SBI channels before taking action.",
+    )
 
 def apply_journey_sequence_rules(needs: list[dict], recommendations: list[dict]) -> list[dict]:
     priority_order = {
@@ -412,9 +487,11 @@ def apply_journey_sequence_rules(needs: list[dict], recommendations: list[dict])
             "step_number": index,
             "need": recommendation["need"],
             "recommended_services": recommendation["recommended_services"],
-            "action": build_next_action(recommendation),
+            "action": recommendation.get("next_best_action") or build_next_action(recommendation),
             "priority": recommendation["priority"],
             "reason": recommendation["reason"],
+            "why_now": recommendation.get("why_now"),
+            "caution": recommendation.get("caution"),
         })
 
     return journey_steps

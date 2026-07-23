@@ -10,17 +10,17 @@ class SBIServiceMapperAgent:
 
         enriched_recommendations = []
         for recommendation in recommendations:
-            service_knowledge = []
-            for service in recommendation.get("recommended_services", []):
-                normalized_service = service.lower()
-                matched = [
-                    item for key, item in semantic_index.items()
-                    if key in normalized_service or normalized_service in key
-                ]
-                service_knowledge.extend(matched)
+            recommended_services = self._dedupe_strings(
+                recommendation.get("recommended_services", [])
+            )
+            service_knowledge = self._find_unique_service_knowledge(
+                recommended_services,
+                semantic_index,
+            )
 
             enriched_recommendations.append({
                 **recommendation,
+                "recommended_services": recommended_services,
                 "service_knowledge": service_knowledge,
             })
 
@@ -40,11 +40,45 @@ class SBIServiceMapperAgent:
         index = {}
 
         for item in semantic_memory:
-            product_name = str(item.get("product_name", "")).lower()
+            product_name = str(item.get("product_name", "")).strip().lower()
             if product_name:
                 index[product_name] = item
 
             for alias in item.get("aliases", []):
-                index[str(alias).lower()] = item
+                normalized_alias = str(alias).strip().lower()
+                if normalized_alias:
+                    index[normalized_alias] = item
 
         return index
+
+    def _find_unique_service_knowledge(
+        self,
+        recommended_services: list[str],
+        semantic_index: dict,
+    ) -> list[dict]:
+        unique_items = {}
+        for service in recommended_services:
+            normalized_service = service.strip().lower()
+            matched = [
+                item for key, item in semantic_index.items()
+                if key in normalized_service or normalized_service in key
+            ]
+
+            for item in matched:
+                product_name = str(item.get("product_name", "")).strip().lower()
+                if product_name:
+                    unique_items[product_name] = item
+
+        return list(unique_items.values())
+
+    def _dedupe_strings(self, values: list[str]) -> list[str]:
+        seen = set()
+        deduped = []
+
+        for value in values:
+            normalized_value = value.strip().lower()
+            if normalized_value and normalized_value not in seen:
+                seen.add(normalized_value)
+                deduped.append(value)
+
+        return deduped

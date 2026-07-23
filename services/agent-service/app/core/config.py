@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="local", alias="ENVIRONMENT")
 
     database_url: str = Field(alias="DATABASE_URL")
-
+    encryption_key: str = Field(alias="ENCRYPTION_KEY")
     kafka_bootstrap_servers: str = Field(alias="KAFKA_BOOTSTRAP_SERVERS")
     context_events_topic: str = Field(alias="CONTEXT_EVENTS_TOPIC")
     agent_events_topic: str = Field(alias="AGENT_EVENTS_TOPIC")
